@@ -1,87 +1,86 @@
-# AWS-Native IAM Security Observability: Real-Time Detection & Dashboarding
+# AWS-Native IAM Security Observability: CloudWatch Dashboarding
 
 ## Executive Summary
 
-This project implements a fully AWS-native security observability solution designed to convert raw CloudTrail logs into near real-time actionable intelligence. By bypassing third-party SIEM complexity, I built a custom detection engine using Amazon CloudWatch that identifies high-fidelity Indicators of Compromise (IoCs) related to Identity and Access Management (IAM) abuse.
+This project addresses a common cloud security challenge: detecting suspicious Identity and Access Management (IAM) activity without relying on expensive third-party SIEMs or solely on opaque log files. I designed and implemented a custom observability solution using **Amazon CloudWatch** to visualize indicators of compromise (IoCs) extracted from **AWS CloudTrail** logs.
 
-The system focuses on detecting the "Persistence" and "Privilege Escalation" tactics of the MITRE ATT&CK framework. Through the use of custom Metric Filters, CloudWatch Metric Math expressions, and embedded Logs Insights, the solution provides a single-pane-of-glass dashboard. This allows security analysts to detect, quantify, and investigate suspicious identity activities—such as unauthorized user creation or credential forging—within minutes of occurrence.
+The solution provides near real-time monitoring of high-risk events—specifically user creation, access key generation, and policy changes. By converting raw logs into visual metrics and utilizing CloudWatch Math expressions, the dashboard offers an immediate "at-a-glance" view of the environment's security posture, enabling rapid response to potential identity-based attacks.
 
 ---
 
 ## Technology Stack
 
-* **Observability & Visualization:** Amazon CloudWatch (Dashboards, Metrics, Logs Insights)
 * **Log Ingestion:** AWS CloudTrail
-* **Detection Logic:** CloudWatch Metric Filters, CloudWatch Metric Math
-* **Automation & Testing:** AWS Lambda (Python/Boto3), AWS IAM
-* **Query Language:** CloudWatch Logs Query Syntax
+* **Visualization:** Amazon CloudWatch Dashboards
+* **Data Analysis:** CloudWatch Logs Insights (Query Language)
+* **Logic:** CloudWatch Metric Filters & Metric Math
+* **Simulation:** AWS Lambda & CloudShell (Bash/CLI)
 
 ---
 
 ## Architecture & Workflow
 
-The solution architecture follows a linear detection pipeline: Logging $\rightarrow$ Extraction $\rightarrow$ Aggregation $\rightarrow$ Visualization. The system ingests management events from CloudTrail, extracts specific security signals using metric filters, and aggregates them into a composite risk score.
+The architecture leverages AWS-native services to transform distinct API events into a unified threat monitoring view.
 
 <p align="center">
-  <img src=".assets/Completed Dashboard.png" alt="Security Monitoring Dashboard" width="800"/>
+  <img src=".assets/Architecture Diagram.png" alt="Architecture Diagram" width="800"/>
   <br>
-  <b>Figure 1: The Completed Security Monitoring Dashboard</b>
+  <b>Figure 1: High-Level Architecture</b>
   <br><br>
-  This dashboard serves as the operational hub for the project. It aggregates distinct security signals into high-level metrics (top row numbers), visualizes attack velocity (line charts), creates a composite risk score using Metric Math (middle row), and allows for immediate drill-down into raw log evidence via the embedded Logs Insights table (bottom).
+  Data flows from CloudTrail management events into CloudWatch Logs. Metric Filters extract specific IAM actions, which populate the custom dashboard widgets.
 </p>
 
 ---
 
-## Implementation Phases
+## Implementation Details
 
-### Phase 1: Signal Extraction (Metric Filters)
+### Phase 1: Metric Extraction
 
-Raw CloudTrail logs are voluminous and difficult to parse manually. I configured **CloudWatch Metric Filters** to sift through the log stream and extract specific API calls that indicate security risks.
+The foundation of the dashboard relies on custom metric filters applied to CloudTrail log groups. I configured filters to track three specific signals often associated with persistence and privilege escalation tactics:
+* `CreateUserCount`
+* `CreateAccessKeyCount`
+* `PutUserPolicyCount`
 
-* **CreateUserCount:** Filters for `eventName="CreateUser"`.
-* **CreateAccessKeyCount:** Filters for `eventName="CreateAccessKey"`.
-* **PutUserPolicyCount:** Filters for `eventName="PutUserPolicy"`.
+### Phase 2: Dashboard Visualization Strategy
 
-These filters convert unstructured log data into numerical metrics (`1` count per event), enabling mathematical analysis and time-series tracking.
+To support different analytical workflows, I implemented multiple visualization types:
 
-### Phase 2: Dashboard Engineering & Metric Math
-
-To reduce alert fatigue and improve signal clarity, I utilized **CloudWatch Metric Math** to create a composite score.
-
-* **Combined Activity Score:** Using the expression `m1 + m2 + m3` (summing all three event types), I created a single "Threat Index." This allows for trend-based detection; a spike in the combined score indicates an active campaign, regardless of the specific technique used.
-* **Stacked Area Analysis:** To differentiate between attack types, a stacked area chart breaks down the total volume. This helps analysts immediately determine if an attacker is focused on lateral movement (Access Keys) or persistence (User Creation).
-
-### Phase 3: Investigation & Attribution
-
-Detection is useless without context. I embedded a **CloudWatch Logs Insights** query directly into the dashboard to bridge the gap between metrics and logs.
-
-**Query Logic:**
-`fields @timestamp, eventName, userIdentity.type, sourceIPAddress | filter eventName in ["CreateUser", "CreateAccessKey", "PutUserPolicy"] | sort @timestamp desc | limit 20`
-
-This query dynamically pulls the relevant metadata—who did it, from what IP, and when—allowing for immediate attribution without leaving the dashboard view.
-
-### Phase 4: Validation & Attack Simulation
-
-To ensure the detection pipeline was functioning correctly, I developed a Python-based **AWS Lambda** function to act as an adversary simulator. The function performs a sequence of IAM actions—creating a user, generating keys, attaching policies, and then cleaning up—to generate realistic "noise" in the environment.
+1.  **Executive Summary (Number Widget):** A rolling 5-minute counter providing a "current state" view of total security events.
+2.  **Trend Analysis (Line Chart):** A 1-minute granularity timeline to identify sudden spikes in activity.
+3.  **Attack Categorization (Stacked Area Chart):** A visual breakdown allowing analysts to distinguish between credential generation vs. policy manipulation attempts.
 
 <p align="center">
-  <img src=".assets/Security Event Generation.png" alt="Attack Simulation Execution" width="800"/>
+  <img src=".assets/Completed Dashboard.png" alt="Completed Dashboard" width="800"/>
   <br>
-  <b>Figure 2: Generating Security Events via CloudShell</b>
+  <b>Figure 2: The Security Monitoring Dashboard</b>
   <br><br>
-  Validating the pipeline by invoking the `generate-security-events` Lambda function using the AWS CLI. The JSON output confirms the successful execution of IAM actions (`CreateUser`, `CreateAccessKey`), which propagate through CloudTrail to populate the dashboard metrics in near real-time.
+  The final dashboard combining signal detection (metrics) and forensic evidence (logs). Note the "Combined IAM Security Activity Score" which uses Metric Math to sum distinct event types into a single risk index.
 </p>
+
+### Phase 3: Advanced Analytics with Metric Math
+
+To reduce the cognitive load of monitoring multiple independent lines, I utilized CloudWatch Metric Math. By defining an expression `m1 + m2 + m3` (representing the sum of the three IAM metrics), I created a composite **"Combined IAM Security Activity Score."** This allows for simplified alerting on "Total Threat Activity" rather than managing alarms for every individual API call.
+
+### Phase 4: Integrated Forensics
+
+Detection requires verification. I embedded a **CloudWatch Logs Insights** query directly into the dashboard. This widget automatically correlates the visual spikes with the underlying log data, displaying the Timestamp, Event Name, Identity Type, and Source IP Address. This enables an analyst to pivot from detection to attribution without leaving the dashboard context.
 
 ---
 
-## Root Cause & Threat Model
+## Validation & Attack Simulation
 
-* **Threat Vector:** Identity Persistence. Attackers who compromise an environment often create "backdoor" users or access keys to maintain access even if the initial entry point is patched.
-* **Operational Gap:** CloudTrail logs are reactive and often reviewed only *after* an incident is suspected.
-* **Solution:** By lifting these specific events into real-time metrics, the organization shifts from reactive forensics to proactive containment.
+To validate the end-to-end detection pipeline, I utilized an AWS Lambda function designed to generate simulated security events. Using AWS CloudShell, I invoked this function to create "noise" in the IAM environment, generating user accounts and access keys.
+
+<p align="center">
+  <img src=".assets/Security Event Generation.png" alt="Security Event Generation" width="800"/>
+  <br>
+  <b>Figure 3: Threat Simulation</b>
+  <br><br>
+  Invoking the attack simulation Lambda via the AWS CLI in CloudShell. This process generated the specific API calls required to populate the dashboard metrics, confirming that the filter patterns and dashboard widgets were correctly wired to the log stream.
+</p>
 
 ---
 
 ## Conclusion
 
-This project demonstrates that effective security observability does not require expensive third-party tools. By mastering first-party AWS services like CloudWatch Metric Filters and Metric Math, I built a robust detection mechanism that provides visibility into critical IAM changes. The resulting workflow reduces the Mean Time to Detect (MTTD) for identity-based threats from hours (log review) to minutes (dashboard visualization).
+This project demonstrates how raw telemetry can be transformed into actionable security insights using standard AWS features. By moving away from reactive log scrolling to proactive dashboard monitoring, the time required to detect identity-based threats is significantly reduced. The resulting dashboard provides a scalable, low-cost alternative to complex SIEM deployments for monitoring core IAM hygiene.
