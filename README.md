@@ -27,7 +27,7 @@ The architecture leverages AWS-native services to transform distinct API events 
   <br>
   <b>Figure 1: High-Level Architecture</b>
   <br><br>
-  Data flows from CloudTrail management events into CloudWatch Logs. Metric Filters extract specific IAM actions, which populate the custom dashboard widgets.
+  The data processing pipeline begins with **CloudTrail** management events being ingested by **CloudWatch Logs**. The flow then splits into two parallel pathways to populate the **CloudWatch Dashboard**: one path uses **Metric Filters** to convert logs into **CloudWatch Metrics** (aggregated via **Metric Math** for visualization), while the other uses **Logs Insights** to directly query and display the raw log evidence.
 </p>
 
 ---
